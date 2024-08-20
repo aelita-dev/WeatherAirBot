@@ -5,10 +5,11 @@ require("dotenv").config();
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const { WEATHER_API_KEY } = process.env;
 const { AIR_API_KEY } = process.env;
+const { FORECAST_API_KEY } = process.env;
 
 const GEO_CODING_URL = `http://api.openweathermap.org/geo/1.0/direct`;
 const CURRENT_WEATHER_URL = `https://api.openweathermap.org/data/2.5/weather`;
-const FORECAST_WEATHER_URL = `https://api.openweathermap.org/data/2.5/forecast`;
+const FORECAST_WEATHER_URL = `https://api.weatherbit.io/v2.0/forecast/daily`;
 const AIR_QUALITY_URL = `http://api.airvisual.com/v2/nearest_city`;
 
 
@@ -53,7 +54,7 @@ bot.on("message", async (ctx) => {
             `Your coordinates: [${location.latitude}, ${location.longitude}]. \nSelect an action:`,
             Markup.inlineKeyboard([
                 [Markup.button.callback('Current weather', 'current')],
-                [Markup.button.callback('Forecast for 5 days', 'forecast')]
+                [Markup.button.callback('Forecast for 7 days', 'forecast')]
             ])
         );
     
@@ -78,6 +79,42 @@ Temperature: ${parseInt(celsius)} °C / ${parseInt(1.8 * celsius + 32)} °F \n
 Weather: ${weatherResponse.data.weather[0].description} \n
 Air quality: ${airQualityResponse.data.data.current.pollution.aqius}`
     );
+})
+
+
+// Response Processing for Forecast
+bot.action('forecast', async ctx => {
+    try {
+        if(location && location.latitude && location.longitude) {
+            const forecastResponse = await axios.get(`${FORECAST_WEATHER_URL}?lat=${location.latitude}&lon=${location.longitude}&key=${FORECAST_API_KEY}`);
+
+            console.log(forecastResponse.data);
+            // console.log(forecastResponse.data.city_name);
+            // console.log(forecastResponse.data.data[0].weather.description);
+            // console.log(forecastResponse.data.data[0].valid_date);
+            // console.log(forecastResponse.data.data[0].low_temp);
+            // console.log(forecastResponse.data.data[0].high_temp);
+
+            if (!forecastResponse || forecastResponse.data.length === 0) {
+                throw new Error('The coordinates of the specified location could not be found.');
+            }
+
+            const data = forecastResponse.data.data;
+
+            const forecastMessage = data.map((day) =>
+`🔹${day.valid_date}
+Weather: ${day.weather.description}
+Nighttime: ${day.low_temp}
+Daytime: ${day.high_temp} \n\n`
+            ).join('')
+
+            ctx.reply(`📍${forecastResponse.data.city_name} \n\n` + forecastMessage);
+        }
+
+    } catch (error) {
+        console.error(error.message);
+        ctx.reply('This location could not be processed. Please try again.');
+    }
 })
 
 
