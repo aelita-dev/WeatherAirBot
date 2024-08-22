@@ -1,4 +1,4 @@
-const { Telegraf, Markup } = require("telegraf");
+const { Telegraf, Markup, session } = require("telegraf");
 const axios = require("axios");
 require("dotenv").config();
 
@@ -19,21 +19,24 @@ const API_URLS = {
 
 const bot = new Telegraf(BOT_TOKEN);
 
+bot.use(session()); // Session
+
 bot.start((ctx) =>
   ctx.reply("Welcome to a Weather Air Bot! \nSend me your Location")
 );
 
 
 // User Location History
-let userLocations = {}
-
-// Current Location State 
-let location = {};
+// let userLocations = {}
 
 
 // Location determination
 bot.on("message", async (ctx) => {
     try {
+        if (!ctx.session) {
+            ctx.session = {};
+        }
+
         const location = ctx.message.location
             ? getCoordinatesFromLocation(ctx.message.location)
             : await getCoordinatesFromText(ctx.update.message.text);
@@ -41,7 +44,10 @@ bot.on("message", async (ctx) => {
         if (!location) {
             throw new Error('The coordinates of the specified location could not be found.');
         }
-        console.log(location);
+
+        ctx.session.location = location;
+
+        console.log(ctx.session.location);
 
         ctx.reply (
             `Your coordinates: [${location.latitude}, ${location.longitude}]. \nSelect an action:`,
@@ -95,7 +101,13 @@ async function getCoordinatesFromText(locationAsText) {
 bot.action('current', async (ctx) => {
 
     try {
-        console.log(location);
+        console.log(ctx.session.location);
+        
+        const location = ctx.session.location;
+        if(!location || !location.latitude || !location.longitude) {
+            throw new Error('Location information is missing.');
+        }
+
         const [weatherResponse, airQualityResponse] = await Promise.all([
             axios.get(API_URLS.currentWeather, {
                 params: {
@@ -134,35 +146,37 @@ bot.action('current', async (ctx) => {
 // Response Processing for Forecast
 bot.action('forecast', async ctx => {
     try {
-        if(location && location.latitude && location.longitude) {
-            const forecastResponse = await axios.get(API_URLS.forecastWeather, {
-                params: {
-                    lat: location.latitude,
-                    lon: location.longitude,
-                    key: API_KEYS.forecast
-                }
-            });
-
-            console.log(forecastResponse.data);
-
-            if (!forecastResponse || forecastResponse.data.data.length === 0) {
-                throw new Error('Forecast data could not be found for the specified location.');
-            }
-
-            const city = forecastResponse.data.city_name;
-            const data = forecastResponse.data.data;
-
-            const forecastMessage = data.map((day) =>
-                `🔹${day.valid_date}\n` +
-                `Weather: ${day.weather.description}\n` +
-                `Nighttime: ${day.low_temp} °C\n` +
-                `Daytime: ${day.high_temp} °C\n\n`
-            ).join('');
-
-            ctx.reply(`📍${city}\n\n${forecastMessage}`);
-        } else {
+        const location = ctx.session.location;
+        if(!location || !location.latitude || !location.longitude) {
             throw new Error('Location information is missing.');
         }
+
+        const forecastResponse = await axios.get(API_URLS.forecastWeather, {
+            params: {
+                lat: location.latitude,
+                lon: location.longitude,
+                key: API_KEYS.forecast
+            }
+        });
+
+        console.log(forecastResponse.data);
+
+        if (!forecastResponse || forecastResponse.data.data.length === 0) {
+            throw new Error('Forecast data could not be found for the specified location.');
+        }
+
+        const city = forecastResponse.data.city_name;
+        const data = forecastResponse.data.data;
+
+        const forecastMessage = data.map((day) =>
+            `🔹${day.valid_date}\n` +
+            `Weather: ${day.weather.description}\n` +
+            `Nighttime: ${day.low_temp} °C\n` +
+            `Daytime: ${day.high_temp} °C\n\n`
+        ).join('');
+
+        ctx.reply(`📍${city}\n\n${forecastMessage}`);
+
     } catch (error) {
         console.error('Error fetching forecast data:', error.message);
         ctx.reply('Failed to retrieve the weather forecast. Please try again later.');
