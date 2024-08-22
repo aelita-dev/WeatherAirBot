@@ -171,8 +171,8 @@ bot.action('forecast', async ctx => {
         const forecastMessage = data.map((day) =>
             `🔹${day.valid_date}\n` +
             `Weather: ${day.weather.description}\n` +
-            `Nighttime: ${day.low_temp} °C\n` +
-            `Daytime: ${day.high_temp} °C\n\n`
+            `Nighttime: ${day.low_temp} °C / ${Math.round(1.8 * day.low_temp + 32)} °F\n` +
+            `Daytime: ${day.high_temp} °C / ${Math.round(1.8 * day.high_temp + 32)} °F\n\n`
         ).join('');
 
         ctx.reply(`📍${city}\n\n${forecastMessage}`);
