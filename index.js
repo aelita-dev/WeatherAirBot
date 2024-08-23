@@ -1,6 +1,7 @@
 const { Telegraf, Markup, session } = require("telegraf");
 const axios = require("axios");
 require("dotenv").config();
+const port = process.env.PORT || 4000;
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 
